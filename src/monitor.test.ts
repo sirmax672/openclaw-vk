@@ -599,6 +599,22 @@ describe("message_new handler", () => {
     expect(events).toContain("message_new");
   });
 
+  it("hydrates a geo marker once and dispatches normalized photos, reply and stable identity", async () => {
+    activeMonitor=startMonitor();await flush();
+    const c=makeCtx({id:0,conversationMessageId:7,geo:{},hasGeo:true,text:"/help"});
+    const hydrate=vi.fn(async()=>Object.assign(c,{id:80,geo:{coordinates:"51.5 25.3"},attachments:[{type:"photo",largeSizeUrl:"https://example.com/geo.jpg"}],replyMessage:{id:6,text:"quoted"},messagePayload:{oc:"/help"}}));
+    c.loadMessagePayload=hydrate;
+    await getMessageHandler()(c);
+    expect(hydrate).toHaveBeenCalledOnce();
+    expect(mockHandleVkInbound.mock.calls[0][0].message).toMatchObject({messageId:"80",conversationMessageId:7,text:"/help",location:{latitude:25.3,longitude:51.5},attachments:[{kind:"image",url:"https://example.com/geo.jpg"}],replyToMessageId:"6",messagePayload:{oc:"/help"}});
+  });
+
+  it("does not dispatch a different message returned by an inconsistent exact hydration", async () => {
+    activeMonitor=startMonitor();await flush();const c=makeCtx({id:42,hasGeo:true,geo:{}});
+    c.loadMessagePayload=async()=>Object.assign(c,{id:99,geo:{coordinates:"51 25"}});
+    await getMessageHandler()(c);expect(mockHandleVkInbound).not.toHaveBeenCalled();
+  });
+
   it("calls handleVkInbound with correct payload on incoming message", async () => {
     activeMonitor = startMonitor();
     await flush();

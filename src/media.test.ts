@@ -93,6 +93,11 @@ describe("extractVkInboundAttachments", () => {
     ]);
   });
 
+  it("keeps the available URL when a vk-io rendition getter throws", () => {
+    const photo={type:"photo",get largeSizeUrl(){throw new TypeError("missing rendition");},mediumSizeUrl:"https://example.com/available.jpg"};
+    expect(extractVkInboundAttachments([photo])[0]).toMatchObject({kind:"image",url:"https://example.com/available.jpg"});
+  });
+
   it("falls back to mediumSizeUrl then smallSizeUrl for photos", () => {
     const result = extractVkInboundAttachments([
       { type: "photo", mediumSizeUrl: "https://example.com/medium.jpg" },

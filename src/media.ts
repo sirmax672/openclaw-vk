@@ -119,8 +119,14 @@ export type VkResolvedOutboundMedia = {
 };
 
 function readString(record: Record<string, unknown>, key: string): string | undefined {
-  const value = record[key];
-  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+  // vk-io's rendition getters throw when that size is absent. Continue to a
+  // smaller rendition or sizes list rather than dropping the whole inbound.
+  try {
+    const value = record[key];
+    return typeof value === "string" && value.trim() ? value.trim() : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function readBoolean(record: Record<string, unknown>, key: string): boolean | undefined {

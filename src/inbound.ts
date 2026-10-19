@@ -10,6 +10,8 @@ import {
 } from "openclaw/plugin-sdk/channel-feedback";
 import {
   logInboundDrop,
+  formatLocationText,
+  toLocationContext,
   toInboundMediaFacts,
   type ChannelInboundMediaInput,
 } from "openclaw/plugin-sdk/channel-inbound";
@@ -208,7 +210,7 @@ export async function handleVkInbound(params: {
     attachments: message.attachments,
     forwards: message.forwards,
   });
-  const commandInput = payloadCommand ?? visibleBody;
+  const commandInput = payloadCommand ?? (visibleBody || (message.location ? "<location>" : ""));
   if (!commandInput) {
     return;
   }
@@ -278,7 +280,7 @@ export async function handleVkInbound(params: {
   const visibleForwards = filterVkForwards(message.forwards, isForwardVisible);
   const firstForward = visibleForwards[0];
   const envelopeOptions = core.channel.reply.resolveEnvelopeFormatOptions(config as OpenClawConfig);
-  const rawBody =
+  const agentBody =
     payloadCommand ??
     resolveVkInboundAgentText({
       text: message.text,
@@ -286,6 +288,7 @@ export async function handleVkInbound(params: {
       forwards: visibleForwards,
       envelope: envelopeOptions,
     });
+  const rawBody = [agentBody, message.location ? formatLocationText(message.location) : ""].filter(Boolean).join("\n");
   if (!rawBody) {
     // Only reachable when every forward was hidden: the empty-message check above
     // already let this one through. Say so, without naming the hidden authors.
@@ -525,6 +528,7 @@ export async function handleVkInbound(params: {
     OriginatingTo: `vk:${peerId}`,
     CommandAuthorized: commandGate.commandAuthorized,
     media: media.length > 0 ? media : undefined,
+    ...(message.location ? toLocationContext(message.location) : {}),
     ...(isQuoteVisible && {
       ReplyToId: message.replyToMessageId,
       ReplyToIdFull: message.replyToMessageId,

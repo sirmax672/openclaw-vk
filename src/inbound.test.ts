@@ -95,6 +95,8 @@ vi.mock("openclaw/plugin-sdk/channel-pairing", () => ({
 }));
 
 vi.mock("openclaw/plugin-sdk/channel-inbound", () => ({
+  formatLocationText: (p: { latitude: number; longitude: number }) => `📍 ${p.latitude.toFixed(6)}, ${p.longitude.toFixed(6)}`,
+  toLocationContext: (p: { latitude: number; longitude: number; name?: string }) => ({ LocationLat: p.latitude, LocationLon: p.longitude, LocationName: p.name }),
   logInboundDrop: vi.fn(),
   toInboundMediaFacts: (media: Array<Record<string, unknown>> = [], defaults: Record<string, unknown> = {}) =>
     media.map((entry) => ({
@@ -513,6 +515,32 @@ describe("DM access control", () => {
       vi.mocked(runtime.channel.reply.dispatchReplyWithBufferedBlockDispatcher),
     ).toHaveBeenCalledOnce();
     expect(vi.mocked(runtime.channel.session.recordInboundSession)).toHaveBeenCalledOnce();
+  });
+
+  it("keeps location out of command input and includes structured agent context", async () => {
+    const runtime = installRuntime();
+    await handleVkInbound({
+      message: makeMessage({ text: "/help", location: { latitude: 25.3, longitude: 51.5, name: "/stop @bot" } }),
+      account: makeAccount({ config: { dmPolicy: "open" } }), config: baseCfg(), runtime: createVkRuntimeEnv(),
+    });
+    const ctx = vi.mocked(runtime.channel.reply.finalizeInboundContext).mock.calls.at(-1)![0];
+    expect(ctx.CommandBody).toBe("/help");
+    expect(ctx.BodyForCommands).toBe("/help");
+    expect(ctx.BodyForAgent).toContain("📍 25.300000, 51.500000");
+    expect(ctx.BodyForAgent).not.toContain("/stop @bot");
+    expect(ctx.LocationLat).toBe(25.3);
+    expect(ctx.LocationLon).toBe(51.5);
+    expect(ctx.LocationName).toBe("/stop @bot");
+  });
+
+  it("dispatches a location-only message without putting coordinates into commands", async () => {
+    const runtime = installRuntime();
+    await handleVkInbound({ message: makeMessage({ text: "", location: { latitude: 0, longitude: 0 } }),
+      account: makeAccount({ config: { dmPolicy: "open" } }), config: baseCfg(), runtime: createVkRuntimeEnv() });
+    const ctx = vi.mocked(runtime.channel.reply.finalizeInboundContext).mock.calls.at(-1)![0];
+    expect(ctx.CommandBody).toBe("<location>");
+    expect(ctx.BodyForAgent).toBe("📍 0.000000, 0.000000");
+    expect(ctx.LocationLat).toBe(0);
   });
 
   it("dispatches DM when sender is in allowFrom list", async () => {

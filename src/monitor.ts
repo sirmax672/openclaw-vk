@@ -8,6 +8,7 @@ import { createStallWatchdog, type StallWatchdog } from "./stall-watchdog.js";
 import { resolveVkAccount } from "./accounts.js";
 import { redactVkId } from "./diagnostics.js";
 import { handleVkInbound } from "./inbound.js";
+import { resolveVkLocation, VkLocationIdentityError } from "./location.js";
 import {
   extractVkInboundAttachments,
   extractVkInboundForwards,
@@ -319,6 +320,18 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
       return;
     }
 
+    let location: Awaited<ReturnType<typeof resolveVkLocation>>;
+    try { location = await resolveVkLocation(context); }
+    catch (error) {
+      if (!(error instanceof VkLocationIdentityError)) throw error;
+      opts.runtime.error?.("vk: inbound skipped (exact hydration identity mismatch)");
+      return;
+    }
+    if (!(Number.isSafeInteger(context.id) && context.id > 0) &&
+        !(Number.isSafeInteger(context.conversationMessageId) && context.conversationMessageId > 0)) {
+      opts.runtime.error?.("vk: inbound skipped (missing stable message identity)");
+      return;
+    }
     const peerId = context.peerId;
     const senderId = context.senderId;
     const text = context.text ?? "";
@@ -332,9 +345,10 @@ export async function monitorVkProvider(opts: VkMonitorOptions): Promise<void> {
         : undefined;
 
     const message: VkInboundMessage = {
-      messageId: String(context.id),
+      messageId: context.id > 0 ? String(context.id) : `peer:${peerId}:cmid:${context.conversationMessageId ?? "unknown"}`,
+      ...(location ? { location } : {}),
       conversationMessageId:
-        typeof context.conversationMessageId === "number" && Number.isFinite(context.conversationMessageId)
+        typeof context.conversationMessageId === "number" && Number.isSafeInteger(context.conversationMessageId) && context.conversationMessageId > 0
           ? context.conversationMessageId
           : undefined,
       peerId,

@@ -1,6 +1,6 @@
 {
   "name": "@openclaw-vk/vk",
-  "version": "2026.10.19",
+  "version": "2026.10.19-diane.1",
   "description": "OpenClaw VK (VKontakte) channel plugin",
   "author": {
     "name": "Pavel Frankov",
@@ -54,6 +54,7 @@
     "src/keyboard.ts",
     "src/media.ts",
     "src/monitor.ts",
+    "src/location.ts",
     "src/probe.ts",
     "src/progress-draft.ts",
     "src/question.ts",

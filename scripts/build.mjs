@@ -22,6 +22,7 @@ const entryPoints = [
   "src/keyboard.ts",
   "src/media.ts",
   "src/monitor.ts",
+  "src/location.ts",
   "src/probe.ts",
   "src/progress-draft.ts",
   "src/question.ts",
